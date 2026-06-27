@@ -4,46 +4,43 @@
     <meta charset="UTF-8">
     <title>Beerka Executive Analytics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <style>
-        body { font-family: 'Inter', sans-serif; background: #f4f7f6; }
-        .header-box { background: #1a2a6c; color: white; padding: 30px; border-radius: 16px; margin-bottom: 25px; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .insight-card { background: #fff; border-left: 6px solid #d4af37; padding: 20px; border-radius: 10px; }
+        :root { --navy: #1a2a6c; --gold: #d4af37; }
+        body { background: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
+        .header-box { background: var(--navy); color: white; padding: 30px; border-radius: 12px; margin-bottom: 25px; }
+        .card { border-radius: 10px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .insight-card { background: #fff; border-left: 6px solid var(--gold); padding: 20px; border-radius: 10px; }
+        .text-gold { color: var(--gold); font-weight: bold; }
     </style>
 </head>
 <body class="p-4">
     <div class="container-fluid">
-        <!-- Header -->
         <div class="header-box">
             <h2>Performa Mystery Shopper & Pelayanan</h2>
             <p>Laporan Monitoring Operasional Kantor Cabang (2026)</p>
         </div>
 
-        <!-- Filter Bar -->
         <div class="card p-3 mb-4">
             <div class="row g-2">
                 <div class="col-md-4"><select id="fReg" class="form-select" onchange="applyFilters()"><option value="All">Semua Regional</option></select></div>
                 <div class="col-md-4"><select id="fPul" class="form-select" onchange="applyFilters()"><option value="All">Semua Pulau</option></select></div>
-                <div class="col-md-4"><select id="fKC" class="form-select" onchange="applyFilters()"><option value="All">Semua KC</option></select></div>
             </div>
         </div>
 
         <div class="row">
-            <!-- Grafik Utama -->
             <div class="col-lg-8">
                 <div class="card p-4"><h5>01. Rata-rata Skor per Regional</h5><div style="height: 300px;"><canvas id="barChart"></canvas></div></div>
                 <div class="card p-4"><h5>02. Analisis Kualitas Layanan</h5><div style="height: 300px;"><canvas id="radarChart"></canvas></div></div>
             </div>
-            <!-- Insight & Table -->
             <div class="col-lg-4">
                 <div class="insight-card mb-4" id="insight">Memuat insight...</div>
                 <div class="card p-4" style="height: 400px; overflow-y: auto;">
                     <h5>Skor Per KC</h5>
-                    <table class="table table-sm"><thead><tr><th>KC</th><th>Skor</th></tr></thead><tbody id="tableBody"></tbody></table>
+                    <table class="table table-sm"><thead><tr><th>KC</th><th>Skor</th></tr></thead><tbody id="tableBody"></tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -55,12 +52,12 @@
 
         Papa.parse(URL, { download: true, header: true, dynamicTyping: true, complete: (res) => {
             allData = res.data;
-            ['Regional', 'Pulau', 'KC'].forEach(f => [...new Set(allData.map(x=>x[f]))].filter(Boolean).forEach(v => $(`#f${f.substring(0,3)}`).append(`<option value="${v}">${v}</option>`)));
+            ['Regional', 'Pulau'].forEach(f => [...new Set(allData.map(x=>x[f]))].filter(Boolean).forEach(v => $(`#f${f.substring(0,3)}`).append(`<option value="${v}">${v}</option>`)));
             applyFilters();
         }});
 
         function applyFilters() {
-            const d = allData.filter(x => ($('#fReg').val() === 'All' || x.Regional === $('#fReg').val()) && ($('#fPul').val() === 'All' || x.Pulau === $('#fPul').val()) && ($('#fKC').val() === 'All' || x.KC === $('#fKC').val()));
+            const d = allData.filter(x => ($('#fReg').val() === 'All' || x.Regional === $('#fReg').val()) && ($('#fPul').val() === 'All' || x.Pulau === $('#fPul').val()));
             updateCharts(d);
         }
 
@@ -68,17 +65,24 @@
             // Bar Chart
             const reg = [...new Set(d.map(x=>x.Regional))].filter(Boolean);
             const score = reg.map(r => (d.filter(x=>x.Regional==r).reduce((a,b)=>a+(b['Total Score']||0),0)/d.filter(x=>x.Regional==r).length).toFixed(1));
-            
             if(window.bChart) window.bChart.destroy();
             window.bChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: reg, datasets: [{ label: 'Skor', data: score, backgroundColor: '#1a2a6c' }] } });
 
             // Radar
+            const s = d.reduce((a,b)=>a+b['Nilai Satpam'],0)/d.length;
+            const i = d.reduce((a,b)=>a+b['Nilai Pelayanan Informasi'],0)/d.length;
+            const p = d.reduce((a,b)=>a+b['Nilai Penanganan Pengaduan'],0)/d.length;
             if(window.rChart) window.rChart.destroy();
-            window.rChart = new Chart(document.getElementById('radarChart'), { type: 'radar', data: { labels: ['Satpam', 'Info', 'Aduan'], datasets: [{ label: 'Kualitas', data: [d.reduce((a,b)=>a+b['Nilai Satpam'],0)/d.length, d.reduce((a,b)=>a+b['Nilai Pelayanan Informasi'],0)/d.length, d.reduce((a,b)=>a+b['Nilai Penanganan Pengaduan'],0)/d.length], backgroundColor: 'rgba(26, 42, 108, 0.2)' }] } });
+            window.rChart = new Chart(document.getElementById('radarChart'), { type: 'radar', data: { labels: ['Satpam', 'Info', 'Pengaduan'], datasets: [{ label: 'Skor Layanan', data: [s, i, p], backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#d4af37' }] } });
 
-            // Table & Insight
+            // Insight Narasi
+            const lowest = s < i ? (s < p ? 'Satpam' : 'Pengaduan') : (i < p ? 'Informasi' : 'Pengaduan');
+            document.getElementById('insight').innerHTML = `
+                <h5>Insight Utama</h5>
+                <p>Skor nasional rata-rata adalah <b>${(d.reduce((a,b)=>a+b['Total Score'],0)/d.length).toFixed(1)}</b>.</p>
+                <p><b>Fokus Perbaikan:</b> Layanan <span class="text-gold">${lowest}</span> saat ini memiliki skor terendah. Direkomendasikan untuk melakukan pelatihan intensif pada aspek tersebut.</p>`;
+
             $('#tableBody').empty(); d.forEach(row => $('#tableBody').append(`<tr><td>${row.KC}</td><td class="fw-bold">${row['Total Score']}</td></tr>`));
-            document.getElementById('insight').innerHTML = `<h5>Insight Utama</h5><p>Data mencakup ${d.length} Kantor Cabang dengan skor rata-rata nasional <b>${(d.reduce((a,b)=>a+b['Total Score'],0)/d.length).toFixed(1)}</b>.</p>`;
         }
     </script>
 </body>
