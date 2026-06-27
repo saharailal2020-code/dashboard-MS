@@ -2,81 +2,76 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Executive Analytics Dashboard</title>
+    <title>Executive Mystery Shopper Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <style>
-        body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; }
-        .header-box { background: #1a2a6c; color: white; padding: 25px; border-radius: 15px; margin-bottom: 20px; }
-        .filter-card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .kpi-card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .insight-card { background: white; border-left: 6px solid #d4af37; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { background: #e0e6ed; font-family: 'Segoe UI', sans-serif; }
+        .dashboard-header { background: #1a2a6c; color: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; }
+        .kpi-box { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); text-align: center; }
+        .card-custom { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .leaderboard-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body class="p-4">
     <div class="container-fluid">
-        <div class="header-box">
-            <h2>Performa Mystery Shopper & Pelayanan</h2>
-            <p>Laporan Monitoring Operasional Kantor Cabang (2026)</p>
+        <div class="dashboard-header d-flex justify-content-between align-items-center">
+            <h2>Monitoring Performa Mystery Shopper</h2>
+            <div class="d-flex gap-2">
+                <select id="fReg" class="form-select" onchange="updateDash()"><option value="All">Regional</option></select>
+                <select id="fPul" class="form-select" onchange="updateDash()"><option value="All">Pulau</option></select>
+            </div>
         </div>
 
-        <!-- Filter Lengkap (Regional, Pulau, KC) -->
-        <div class="filter-card">
-            <div class="row g-2">
-                <div class="col-md-4"><select id="fReg" class="form-select" onchange="applyFilters()"><option value="All">Semua Regional</option></select></div>
-                <div class="col-md-4"><select id="fPul" class="form-select" onchange="applyFilters()"><option value="All">Semua Pulau</option></select></div>
-                <div class="col-md-4"><select id="fKC" class="form-select" onchange="applyFilters()"><option value="All">Semua KC</option></select></div>
-            </div>
+        <!-- KPI Section -->
+        <div class="row mb-4">
+            <div class="col-md-4"><div class="kpi-box"><h5>Skor Satpam</h5><h2 id="kpiSat" class="text-primary">0</h2></div></div>
+            <div class="col-md-4"><div class="kpi-box"><h5>Skor Informasi</h5><h2 id="kpiInf" class="text-primary">0</h2></div></div>
+            <div class="col-md-4"><div class="kpi-box"><h5>Skor Pengaduan</h5><h2 id="kpiAdu" class="text-primary">0</h2></div></div>
         </div>
 
         <div class="row">
+            <!-- Chart Section -->
             <div class="col-lg-8">
-                <div class="kpi-card mb-4"><h5>01. Rata-rata Skor per Regional</h5><canvas id="barChart" height="120"></canvas></div>
-                <div class="kpi-card"><h5>02. Analisis Kualitas Layanan (Radar)</h5><canvas id="radarChart" height="120"></canvas></div>
+                <div class="card-custom"><h5>Tren Skor Semester</h5><canvas id="lineChart" height="150"></canvas></div>
             </div>
+            <!-- Leaderboard Section -->
             <div class="col-lg-4">
-                <div class="insight-card mb-4" id="insight">Memuat insight...</div>
-                <div class="kpi-card" style="height: 350px; overflow-y: auto;">
-                    <h5>Skor Per KC</h5>
-                    <table class="table table-sm"><thead><tr><th>KC</th><th>Skor</th></tr></thead><tbody id="tableBody"></tbody></table>
-                </div>
+                <div class="card-custom"><h5>Shopper Performa Terbaik</h5><div id="leaderboard"></div></div>
             </div>
         </div>
     </div>
 
     <script>
-        let allData = [];
+        let data = [];
         const URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
 
         Papa.parse(URL, { download: true, header: true, dynamicTyping: true, complete: (res) => {
-            allData = res.data;
-            ['Regional', 'Pulau', 'KC'].forEach(f => [...new Set(allData.map(x=>x[f]))].filter(Boolean).forEach(v => $(`#f${f.substring(0,3)}`).append(`<option value="${v}">${v}</option>`)));
-            applyFilters();
+            data = res.data;
+            ['Regional', 'Pulau'].forEach(f => [...new Set(data.map(x=>x[f]))].filter(Boolean).forEach(v => $(`#f${f.substring(0,3)}`).append(`<option value="${v}">${v}</option>`)));
+            updateDash();
         }});
 
-        function applyFilters() {
-            const d = allData.filter(x => ($('#fReg').val() === 'All' || x.Regional === $('#fReg').val()) && ($('#fPul').val() === 'All' || x.Pulau === $('#fPul').val()) && ($('#fKC').val() === 'All' || x.KC === $('#fKC').val()));
-            updateCharts(d);
-        }
-
-        function updateCharts(d) {
-            const reg = [...new Set(d.map(x=>x.Regional))].filter(Boolean);
-            const score = reg.map(r => (d.filter(x=>x.Regional==r).reduce((a,b)=>a+(b['Total Score']||0),0)/d.filter(x=>x.Regional==r).length).toFixed(1));
+        function updateDash() {
+            const d = data.filter(x => ($('#fReg').val() === 'All' || x.Regional === $('#fReg').val()) && ($('#fPul').val() === 'All' || x.Pulau === $('#fPul').val()));
             
-            if(window.bChart) window.bChart.destroy();
-            window.bChart = new Chart(document.getElementById('barChart'), { type: 'bar', data: { labels: reg, datasets: [{ label: 'Skor', data: score, backgroundColor: '#1a2a6c' }] } });
+            // KPI Update
+            $('#kpiSat').text((d.reduce((a,b)=>a+b['Nilai Satpam'],0)/d.length).toFixed(1));
+            $('#kpiInf').text((d.reduce((a,b)=>a+b['Nilai Pelayanan Informasi'],0)/d.length).toFixed(1));
+            $('#kpiAdu').text((d.reduce((a,b)=>a+b['Nilai Penanganan Pengaduan'],0)/d.length).toFixed(1));
 
-            const s = d.reduce((a,b)=>a+b['Nilai Satpam'],0)/d.length;
-            const i = d.reduce((a,b)=>a+b['Nilai Pelayanan Informasi'],0)/d.length;
-            const p = d.reduce((a,b)=>a+b['Nilai Penanganan Pengaduan'],0)/d.length;
-            if(window.rChart) window.rChart.destroy();
-            window.rChart = new Chart(document.getElementById('radarChart'), { type: 'radar', data: { labels: ['Satpam', 'Info', 'Pengaduan'], datasets: [{ label: 'Skor Layanan', data: [s, i, p], backgroundColor: 'rgba(212, 175, 55, 0.2)', borderColor: '#d4af37' }] } });
+            // Chart
+            if(window.lChart) window.lChart.destroy();
+            window.lChart = new Chart(document.getElementById('lineChart'), {
+                type: 'line', data: { labels: ['Smt 1', 'Smt 2'], datasets: [{ label: 'Total Score', data: [d.filter(x=>x.Semester=='Semester 1').reduce((a,b)=>a+b['Total Score'],0)/d.filter(x=>x.Semester=='Semester 1').length, d.filter(x=>x.Semester=='Semester 2').reduce((a,b)=>a+b['Total Score'],0)/d.filter(x=>x.Semester=='Semester 2').length], borderColor: '#1a2a6c', tension: 0.4, fill: true, backgroundColor: 'rgba(26, 42, 108, 0.1)' }] }
+            });
 
-            const lowest = s < i ? (s < p ? 'Satpam' : 'Pengaduan') : (i < p ? 'Informasi' : 'Pengaduan');
-            $('#insight').html(`<h5>Insight Utama</h5><p>Rata-rata nasional: <b>${(d.reduce((a,b)=>a+b['Total Score'],0)/d.length).toFixed(1)}</b>.</p><p><b>Fokus:</b> Layanan <span class="text-warning fw-bold">${lowest}</span> perlu ditingkatkan.</p>`);
-            $('#tableBody').empty(); d.forEach(row => $('#tableBody').append(`<tr><td>${row.KC}</td><td class="fw-bold">${row['Total Score']}</td></tr>`));
+            // Leaderboard (Shopper)
+            $('#leaderboard').empty();
+            const top = [...d].sort((a,b)=>b['Total Score']-a['Total Score']).slice(0,5);
+            top.forEach(row => $('#leaderboard').append(`<div class="leaderboard-item"><span>${row.KC}</span><b>${row['Total Score']}</b></div>`));
         }
     </script>
 </body>
