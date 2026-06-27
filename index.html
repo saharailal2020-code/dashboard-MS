@@ -2,71 +2,68 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Beerka Executive Dashboard</title>
+    <title>Beerka Executive Analytics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <style>
-        body { background: #f4f6f7; font-family: 'Segoe UI', sans-serif; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
-        .insight-box { background: #ffffff; border-left: 5px solid #d4af37; padding: 15px; }
-        .header-section { background: #2c3e50; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+        body { background: #f0f2f5; font-family: 'Inter', sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
     </style>
 </head>
 <body class="p-4">
     <div class="container-fluid">
-        <div class="header-section">
-            <h2>Performa Mystery Shopper & Pelayanan</h2>
-            <p>Laporan Monitoring Operasional Kantor Cabang (2026)</p>
+        <h2 class="mb-4">Mystery Shopper Intelligence</h2>
+        
+        <div class="card p-3 mb-4">
+            <div class="row g-2">
+                <div class="col-md-3"><select id="fReg" class="form-select" onchange="filterData()"><option value="All">Semua Regional</option></select></div>
+                <div class="col-md-3"><select id="fPul" class="form-select" onchange="filterData()"><option value="All">Semua Pulau</option></select></div>
+                <div class="col-md-3"><select id="fKC" class="form-select" onchange="filterData()"><option value="All">Semua KC</option></select></div>
+            </div>
         </div>
 
         <div class="row">
-            <div class="col-lg-8">
-                <div class="card p-4">
-                    <h5>01. Rata-rata Skor per Regional</h5>
-                    <div style="height: 300px;"><canvas id="barChart"></canvas></div>
-                </div>
-            </div>
-            <div class="col-lg-4">
-                <div class="card insight-box">
-                    <h5><i class="bi bi-lightbulb"></i> Insight Utama</h5>
-                    <div id="narasiInsight">Memproses data...</div>
-                </div>
-            </div>
+            <div class="col-lg-6"><div class="card p-4"><h5>Perbandingan Semester</h5><canvas id="semesterChart"></canvas></div></div>
+            <div class="col-lg-6"><div class="card p-4"><h5>Analisis Layanan (Satpam/Info/Aduan)</h5><canvas id="radarChart"></canvas></div></div>
         </div>
     </div>
 
     <script>
-        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
+        let data = [];
+        const URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
 
-        Papa.parse(SHEET_URL, {
-            download: true, header: true, dynamicTyping: true,
-            complete: (results) => {
-                const data = results.data;
-                const regions = [...new Set(data.map(x => x.Regional))].filter(Boolean);
-                const scores = regions.map(r => {
-                    const grp = data.filter(x => x.Regional === r);
-                    return (grp.reduce((a,b) => a + (b['Total Score'] || 0), 0) / grp.length).toFixed(2);
-                });
+        Papa.parse(URL, { download: true, header: true, dynamicTyping: true, complete: (res) => {
+            data = res.data;
+            ['Regional', 'Pulau', 'KC'].forEach(f => {
+                [...new Set(data.map(x=>x[f]))].filter(Boolean).forEach(v => $(`#f${f.substring(0,3)}`).append(`<option value="${v}">${v}</option>`));
+            });
+            filterData();
+        }});
 
-                // Chart
-                new Chart(document.getElementById('barChart'), {
-                    type: 'bar',
-                    data: { labels: regions, datasets: [{ label: 'Skor Rata-rata', data: scores, backgroundColor: '#34495e' }] },
-                    options: { maintainAspectRatio: false }
-                });
+        function filterData() {
+            let filtered = data.filter(x => 
+                ($('#fReg').val() === 'All' || x.Regional === $('#fReg').val()) &&
+                ($('#fPul').val() === 'All' || x.Pulau === $('#fPul').val()) &&
+                ($('#fKC').val() === 'All' || x.KC === $('#fKC').val())
+            );
+            updateCharts(filtered);
+        }
 
-                // Narasi Otomatis (Storytelling)
-                const bestReg = regions[scores.indexOf(Math.max(...scores).toString())];
-                const worstReg = regions[scores.indexOf(Math.min(...scores).toString())];
-                document.getElementById('narasiInsight').innerHTML = `
-                    <p>Performa tertinggi saat ini dicapai oleh <b>${bestReg}</b>. 
-                    Sementara itu, <b>${worstReg}</b> memerlukan supervisi lebih lanjut untuk meningkatkan kualitas layanan.</p>
-                    <hr>
-                    <p><b>Fokus Perbaikan:</b> Penetrasi standar pelayanan pada regional dengan skor di bawah rata-rata nasional.</p>
-                `;
-            }
-        });
+        function updateCharts(d) {
+            // Chart Semester
+            new Chart(document.getElementById('semesterChart'), {
+                type: 'bar',
+                data: { labels: ['Smt 1', 'Smt 2'], datasets: [{ label: 'Skor', data: [d.filter(x=>x.Semester=='Semester 1').length ? d.filter(x=>x.Semester=='Semester 1').reduce((a,b)=>a+b['Total Score'],0)/d.filter(x=>x.Semester=='Semester 1').length : 0, d.filter(x=>x.Semester=='Semester 2').length ? d.filter(x=>x.Semester=='Semester 2').reduce((a,b)=>a+b['Total Score'],0)/d.filter(x=>x.Semester=='Semester 2').length : 0], backgroundColor: ['#3498db', '#2ecc71'] }] }
+            });
+
+            // Radar Chart
+            new Chart(document.getElementById('radarChart'), {
+                type: 'radar',
+                data: { labels: ['Satpam', 'Info', 'Aduan'], datasets: [{ label: 'Kualitas', data: [d.reduce((a,b)=>a+b['Nilai Satpam'],0)/d.length, d.reduce((a,b)=>a+b['Nilai Pelayanan Informasi'],0)/d.length, d.reduce((a,b)=>a+b['Nilai Penanganan Pengaduan'],0)/d.length], backgroundColor: 'rgba(52, 152, 219, 0.2)' }] }
+            });
+        }
     </script>
 </body>
 </html>
