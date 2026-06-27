@@ -2,30 +2,73 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard BPJS</title>
-    <!-- Library -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Mystery Shopper BPJS</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
     <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-    <div id="status">Memuat data...</div>
+<body class="bg-light">
+
+    <div class="container py-5">
+        <h2 class="mb-4">Dashboard Monitoring Mystery Shopper</h2>
+        <div id="status" class="alert alert-info">Memuat data dari Google Sheets...</div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card p-3 mb-4">
+                    <h5>Analisis Nasional</h5>
+                    <canvas id="myChart"></canvas>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card p-3 mb-4">
+                    <h5>Ranking Kantor Cabang</h5>
+                    <table id="tableKC" class="table table-striped">
+                        <thead><tr><th>KC</th><th>Skor</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // GANTI URL DISINI DENGAN URL YANG TADI ANDA COBA
+        // MASUKKAN URL ANDA DISINI
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
 
         Papa.parse(SHEET_URL, {
             download: true,
             header: true,
+            dynamicTyping: true,
             complete: function(results) {
-                console.log("Data berhasil dimuat:", results.data);
-                document.getElementById('status').innerHTML = "Data berhasil dimuat! Jumlah baris: " + results.data.length;
-                // Jika muncul tulisan ini, berarti masalah utama sudah teratasi.
+                const data = results.data;
+                document.getElementById('status').style.display = 'none';
+                
+                // Proses Data untuk Grafik
+                const labels = data.map(x => x.KC);
+                const scores = data.map(x => x['Total Score']);
+
+                new Chart(document.getElementById('myChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{ label: 'Total Score', data: scores, backgroundColor: '#0D6EFD' }]
+                    }
+                });
+
+                // Isi Tabel
+                const tbody = document.querySelector('#tableKC tbody');
+                data.forEach(row => {
+                    tbody.innerHTML += `<tr><td>${row.KC}</td><td>${row['Total Score']}</td></tr>`;
+                });
             },
             error: function(err) {
-                document.getElementById('status').innerHTML = "Error: " + err;
-                console.error("Detail Error:", err);
+                document.getElementById('status').className = "alert alert-danger";
+                document.getElementById('status').innerHTML = "Error memuat data: " + err;
             }
         });
     </script>
