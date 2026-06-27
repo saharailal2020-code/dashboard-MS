@@ -2,58 +2,80 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Dashboard BPJS Final</title>
+    <title>Executive BPJS Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
 </head>
 <body class="bg-light p-4">
+    <div class="container-fluid">
+        <h3 class="mb-4">Executive Mystery Shopper Dashboard</h3>
+        
+        <div class="card p-3 mb-4">
+            <select id="filterRegional" class="form-select" onchange="updateView()">
+                <option value="All">Semua Regional (Ringkasan Nasional)</option>
+            </select>
+        </div>
 
-    <div class="container">
-        <h2 class="mb-4">Dashboard Monitoring Mystery Shopper</h2>
-        <div id="status" class="alert alert-info">Memproses data...</div>
-        <div id="dashboard-content">
-            <div class="card p-4 mb-4">
-                <canvas id="myChart" height="100"></canvas>
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card p-4">
+                    <h5>Rata-rata Skor per Regional</h5>
+                    <div style="height: 300px;"><canvas id="barChart"></canvas></div>
+                </div>
             </div>
-            <div class="card p-4">
-                <table id="tabelData" class="table"><thead><tr id="tableHead"></tr></thead><tbody id="tableBody"></tbody></table>
+            <div class="col-md-4">
+                <div class="card p-4" style="height: 364px; overflow-y: auto;">
+                    <h5>Skor Per Kantor Cabang</h5>
+                    <table class="table table-sm">
+                        <thead><tr><th>KC</th><th>Skor</th></tr></thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        let allData = [];
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
 
         Papa.parse(SHEET_URL, {
-            download: true,
-            header: true,
-            dynamicTyping: true,
-            complete: function(results) {
-                const data = results.data;
-                const keys = Object.keys(data[0]); // Mengambil nama kolom asli dari sheet
-                
-                document.getElementById('status').style.display = 'none';
-
-                // Render Chart (Menggunakan kolom ke-2 untuk Label, kolom ke-13 untuk Skor)
-                new Chart(document.getElementById('myChart'), {
-                    type: 'bar',
-                    data: {
-                        labels: data.map(x => x[keys[1]]),
-                        datasets: [{ label: 'Score', data: data.map(x => x[keys[12]]), backgroundColor: '#0D6EFD' }]
-                    }
-                });
-
-                // Render Tabel
-                keys.forEach(k => $('#tableHead').append(`<th>${k}</th>`));
-                data.forEach(row => {
-                    let tr = '<tr>';
-                    keys.forEach(k => tr += `<td>${row[k]}</td>`);
-                    $('#tableBody').append(tr + '</tr>');
-                });
+            download: true, header: true, dynamicTyping: true,
+            complete: (results) => {
+                allData = results.data;
+                const regionals = [...new Set(allData.map(x => x.Regional))];
+                regionals.forEach(r => { if(r) $('#filterRegional').append(`<option value="${r}">${r}</option>`) });
+                updateView();
             }
         });
+
+        function updateView() {
+            const filter = $('#filterRegional').val();
+            const data = filter === 'All' ? allData : allData.filter(x => x.Regional === filter);
+            
+            // Menggunakan nama kolom yang TEPAT dari sheet Anda: "Regional" dan "Total Score"
+            const regions = [...new Set(data.map(x => x.Regional))].filter(Boolean);
+            const scores = regions.map(r => {
+                const group = data.filter(x => x.Regional === r);
+                return (group.reduce((a,b) => a + (b['Total Score'] || 0), 0) / group.length).toFixed(1);
+            });
+
+            if(window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(document.getElementById('barChart'), {
+                type: 'bar',
+                data: { labels: regions, datasets: [{ label: 'Rata-rata Total Score', data: scores, backgroundColor: '#0D6EFD' }] },
+                options: { maintainAspectRatio: false }
+            });
+
+            $('#tableBody').empty();
+            data.forEach(row => {
+                if(row.KC) {
+                    $('#tableBody').append(`<tr><td>${row.KC}</td><td class="fw-bold">${row['Total Score']}</td></tr>`);
+                }
+            });
+        }
     </script>
 </body>
 </html>
