@@ -2,80 +2,71 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Executive BPJS Dashboard</title>
+    <title>Beerka Executive Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <style>
+        body { background: #f4f6f7; font-family: 'Segoe UI', sans-serif; }
+        .card { border-radius: 12px; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 20px; }
+        .insight-box { background: #ffffff; border-left: 5px solid #d4af37; padding: 15px; }
+        .header-section { background: #2c3e50; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
+    </style>
 </head>
-<body class="bg-light p-4">
+<body class="p-4">
     <div class="container-fluid">
-        <h3 class="mb-4">Executive Mystery Shopper Dashboard</h3>
-        
-        <div class="card p-3 mb-4">
-            <select id="filterRegional" class="form-select" onchange="updateView()">
-                <option value="All">Semua Regional (Ringkasan Nasional)</option>
-            </select>
+        <div class="header-section">
+            <h2>Performa Mystery Shopper & Pelayanan</h2>
+            <p>Laporan Monitoring Operasional Kantor Cabang (2026)</p>
         </div>
 
         <div class="row">
-            <div class="col-md-8">
+            <div class="col-lg-8">
                 <div class="card p-4">
-                    <h5>Rata-rata Skor per Regional</h5>
+                    <h5>01. Rata-rata Skor per Regional</h5>
                     <div style="height: 300px;"><canvas id="barChart"></canvas></div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card p-4" style="height: 364px; overflow-y: auto;">
-                    <h5>Skor Per Kantor Cabang</h5>
-                    <table class="table table-sm">
-                        <thead><tr><th>KC</th><th>Skor</th></tr></thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
+            <div class="col-lg-4">
+                <div class="card insight-box">
+                    <h5><i class="bi bi-lightbulb"></i> Insight Utama</h5>
+                    <div id="narasiInsight">Memproses data...</div>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let allData = [];
         const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?output=csv';
 
         Papa.parse(SHEET_URL, {
             download: true, header: true, dynamicTyping: true,
             complete: (results) => {
-                allData = results.data;
-                const regionals = [...new Set(allData.map(x => x.Regional))];
-                regionals.forEach(r => { if(r) $('#filterRegional').append(`<option value="${r}">${r}</option>`) });
-                updateView();
+                const data = results.data;
+                const regions = [...new Set(data.map(x => x.Regional))].filter(Boolean);
+                const scores = regions.map(r => {
+                    const grp = data.filter(x => x.Regional === r);
+                    return (grp.reduce((a,b) => a + (b['Total Score'] || 0), 0) / grp.length).toFixed(2);
+                });
+
+                // Chart
+                new Chart(document.getElementById('barChart'), {
+                    type: 'bar',
+                    data: { labels: regions, datasets: [{ label: 'Skor Rata-rata', data: scores, backgroundColor: '#34495e' }] },
+                    options: { maintainAspectRatio: false }
+                });
+
+                // Narasi Otomatis (Storytelling)
+                const bestReg = regions[scores.indexOf(Math.max(...scores).toString())];
+                const worstReg = regions[scores.indexOf(Math.min(...scores).toString())];
+                document.getElementById('narasiInsight').innerHTML = `
+                    <p>Performa tertinggi saat ini dicapai oleh <b>${bestReg}</b>. 
+                    Sementara itu, <b>${worstReg}</b> memerlukan supervisi lebih lanjut untuk meningkatkan kualitas layanan.</p>
+                    <hr>
+                    <p><b>Fokus Perbaikan:</b> Penetrasi standar pelayanan pada regional dengan skor di bawah rata-rata nasional.</p>
+                `;
             }
         });
-
-        function updateView() {
-            const filter = $('#filterRegional').val();
-            const data = filter === 'All' ? allData : allData.filter(x => x.Regional === filter);
-            
-            // Menggunakan nama kolom yang TEPAT dari sheet Anda: "Regional" dan "Total Score"
-            const regions = [...new Set(data.map(x => x.Regional))].filter(Boolean);
-            const scores = regions.map(r => {
-                const group = data.filter(x => x.Regional === r);
-                return (group.reduce((a,b) => a + (b['Total Score'] || 0), 0) / group.length).toFixed(1);
-            });
-
-            if(window.myChart) window.myChart.destroy();
-            window.myChart = new Chart(document.getElementById('barChart'), {
-                type: 'bar',
-                data: { labels: regions, datasets: [{ label: 'Rata-rata Total Score', data: scores, backgroundColor: '#0D6EFD' }] },
-                options: { maintainAspectRatio: false }
-            });
-
-            $('#tableBody').empty();
-            data.forEach(row => {
-                if(row.KC) {
-                    $('#tableBody').append(`<tr><td>${row.KC}</td><td class="fw-bold">${row['Total Score']}</td></tr>`);
-                }
-            });
-        }
     </script>
 </body>
 </html>
