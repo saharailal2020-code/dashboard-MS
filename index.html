@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mystery Shopper Dashboard | BPJS Kesehatan</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.5/css/dataTables.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.bootstrap5.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        :root {
+            --bpjs-blue: #0D6EFD;
+            --bpjs-light-blue: #e7f1ff;
+            --bpjs-green: #198754;
+            --bpjs-light-green: #d1e7dd;
+            --gray-light: #f8f9fa;
+            --text-dark: #1e293b;
+            --glass: rgba(255, 255, 255, 0.85);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+            overflow-x: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: 260px;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            background: white;
+            border-right: 1px solid #e2e8f0;
+            z-index: 1000;
+            transition: all 0.3s;
+        }
+
+        .sidebar-header {
+            padding: 2rem 1.5rem;
+            text-align: center;
+        }
+
+        .sidebar-logo {
+            width: 150px;
+            margin-bottom: 1rem;
+        }
+
+        .nav-link {
+            padding: 0.8rem 1.5rem;
+            color: #64748b;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: 0.2s;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--bpjs-blue);
+            background: var(--bpjs-light-blue);
+            border-right: 4px solid var(--bpjs-blue);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+            background: var(--glass);
+            backdrop-filter: blur(8px);
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-card {
+            padding: 1.5rem;
+            transition: transform 0.2s;
+        }
+
+        .kpi-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .kpi-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Map Styling */
+        #indonesia-map {
+            height: 450px;
+            border-radius: 12px;
+            background: #cbd5e1;
+        }
+
+        /* Loading Spinner */
+        #loader {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            color: var(--bpjs-blue);
+        }
+
+        @media (max-width: 992px) {
+            .sidebar { left: -260px; }
+            .main-content { margin-left: 0; }
+            .sidebar.active { left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div class="spinner-border mb-3" role="status"></div>
+        <h5 class="fw-bold">Memuat Data Analitik...</h5>
+    </div>
+
+    <nav class="sidebar">
+        <div class="sidebar-header">
+            <h4 class="fw-bold text-primary">MS DASHBOARD</h4>
+            <span class="badge bg-success">BPJS Kesehatan</span>
+        </div>
+        <div class="nav flex-column">
+            <a href="#summary" class="nav-link active"><i class="fa-solid fa-chart-line"></i> Summary</a>
+            <a href="#ranking" class="nav-link"><i class="fa-solid fa-trophy"></i> Ranking KC</a>
+            <a href="#geografis" class="nav-link"><i class="fa-solid fa-map"></i> Geografis</a>
+            <a href="#analisis" class="nav-link"><i class="fa-solid fa-magnifying-glass-chart"></i> Detail Analisis</a>
+            <a href="#detail-kc" class="nav-link"><i class="fa-solid fa-building"></i> Profile KC</a>
+        </div>
+    </nav>
+
+    <div class="main-content">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="fw-bold m-0">National Mystery Shopper Summary</h2>
+                <p class="text-muted">Periode Survey: 2025/2026</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" id="darkToggle"><i class="fa-solid fa-moon"></i></button>
+                <button class="btn btn-primary" onclick="window.print()"><i class="fa-solid fa-download"></i> Laporan</button>
+            </div>
+        </header>
+
+        <div class="card p-3 mb-4">
+            <div class="row g-3">
+                <div class="col-md-2">
+                    <label class="small fw-bold">Regional</label>
+                    <select class="form-select filter-select" id="filterRegional"><option value="All">Semua Regional</option></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold">Pulau</label>
+                    <select class="form-select filter-select" id="filterPulau"><option value="All">Semua Pulau</option></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold">Predikat</label>
+                    <select class="form-select filter-select" id="filterPredikat"><option value="All">Semua Predikat</option></select>
+                </div>
+                <div class="col-md-2">
+                    <label class="small fw-bold">Semester</label>
+                    <select class="form-select filter-select" id="filterSemester"><option value="All">Semua Semester</option></select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" onclick="applyFilters()">Terapkan Filter</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="summary">
+            <div class="row row-cols-1 row-cols-md-4 g-3 mb-4">
+                <div class="col">
+                    <div class="card kpi-card">
+                        <div class="kpi-icon bg-primary text-white"><i class="fa-solid fa-building"></i></div>
+                        <p class="text-muted small fw-bold mb-1">TOTAL KC</p>
+                        <h3 class="fw-bold mb-0" id="statTotalKC">0</h3>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card kpi-card border-start border-4 border-primary">
+                        <div class="kpi-icon bg-light text-primary"><i class="fa-solid fa-star"></i></div>
+                        <p class="text-muted small fw-bold mb-1">SKOR NASIONAL</p>
+                        <h3 class="fw-bold mb-0 text-primary" id="statSkorNasional">0</h3>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card kpi-card">
+                        <div class="kpi-icon bg-success text-white"><i class="fa-solid fa-face-smile"></i></div>
+                        <p class="text-muted small fw-bold mb-1">NPS RATA-RATA</p>
+                        <h3 class="fw-bold mb-0" id="statNPS">0</h3>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="card kpi-card bg-danger text-white">
+                        <div class="kpi-icon bg-white text-danger"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        <p class="small fw-bold mb-1">TEMUAN CRITICAL</p>
+                        <h3 class="fw-bold mb-0" id="statCritical">0</h3>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <div class="card p-4">
+                        <h5 class="fw-bold mb-4">Analisis Layanan vs Target (95)</h5>
+                        <canvas id="chartLayanan" height="250"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-4">
+                        <h5 class="fw-bold mb-4">Distribusi Predikat</h5>
+                        <canvas id="chartPredikat" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="geografis" class="mt-4">
+            <div class="row g-3">
+                <div class="col-md-12">
+                    <div class="card p-4">
+                        <h5 class="fw-bold mb-3">Heatmap Performa Per Provinsi</h5>
+                        <div id="indonesia-map"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <h5 class="fw-bold mb-3">Analisis per Regional</h5>
+                        <canvas id="chartRegional"></canvas>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-4">
+                        <h5 class="fw-bold mb-3">Analisis per Pulau (Radar)</h5>
+                        <canvas id="chartPulau"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="ranking" class="mt-4">
+            <div class="card p-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold m-0">Ranking Kantor Cabang Nasional</h5>
+                </div>
+                <div class="table-responsive">
+                    <table id="tableKC" class="table table-hover w-100">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Rank</th>
+                                <th>KC</th>
+                                <th>Regional</th>
+                                <th>Skor</th>
+                                <th>Predikat</th>
+                                <th>Mayor</th>
+                                <th>Critical</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="detail-kc" class="mt-4">
+            <div class="card p-4">
+                <div class="row align-items-center g-3">
+                    <div class="col-md-4">
+                        <h5 class="fw-bold m-0">Detail Analisis Kantor Cabang</h5>
+                    </div>
+                    <div class="col-md-8">
+                        <select class="form-select" id="selectKC" onchange="showDetailKC(this.value)">
+                            <option value="">Pilih Kantor Cabang...</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="kc-detail-content" class="mt-4 d-none">
+                    <div class="row">
+                        <div class="col-md-4 text-center border-end">
+                            <h2 class="fw-bold text-primary" id="detSkor">98</h2>
+                            <span class="badge bg-success p-2" id="detPredikat">Sangat Baik</span>
+                            <hr>
+                            <div class="text-start small">
+                                <p><strong>Regional:</strong> <span id="detRegional"></span></p>
+                                <p><strong>Provinsi:</strong> <span id="detProv"></span></p>
+                                <p><strong>Shopper:</strong> <span id="detShopper"></span></p>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <h6 class="fw-bold">Komentar Shopper:</h6>
+                            <p class="fst-italic text-muted" id="detKomentar">"Data tidak tersedia."</p>
+                            <canvas id="chartRadarKC" height="150"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.5/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // GANTI DENGAN URL GOOGLE SHEET CSV ANDA
+        const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTNfJvpmBizigPToxJkwKnvyR0304-7Iy2QkrgRZ-XG6SoQNbJYZdHE5POO3CaE9SiiFsUxFpRRHKl1/pub?gid=0&single=true&output=csv'; 
+        
+        let rawData = [];
+        let filteredData = [];
+        let mainChart, predikatChart, regionalChart, pulauChart, radarKCChart;
+
+        $(document).ready(function() {
+            initData();
+        });
+
+        async function initData() {
+            Papa.parse(SHEET_URL, {
+                download: true,
+                header: true,
+                dynamicTyping: true,
+                complete: function(results) {
+                    rawData = results.data;
+                    filteredData = [...rawData];
+                    populateFilters();
+                    updateDashboard();
+                    $('#loader').fadeOut();
+                }
+            });
+        }
+
+        function populateFilters() {
+            const regionals = [...new Set(rawData.map(x => x.Regional))].sort();
+            const islands = [...new Set(rawData.map(x => x.Pulau))].sort();
+            const kcs = [...new Set(rawData.map(x => x.KC))].sort();
+
+            regionals.forEach(r => $('#filterRegional').append(`<option value="${r}">${r}</option>`));
+            islands.forEach(i => $('#filterPulau').append(`<option value="${i}">${i}</option>`));
+            kcs.forEach(k => $('#selectKC').append(`<option value="${k}">${k}</option>`));
+        }
+
+        function applyFilters() {
+            const reg = $('#filterRegional').val();
+            const pul = $('#filterPulau').val();
+            const pre = $('#filterPredikat').val();
+
+            filteredData = rawData.filter(x => {
+                return (reg === 'All' || x.Regional === reg) &&
+                       (pul === 'All' || x.Pulau === pul) &&
+                       (pre === 'All' || x.Predikat === pre);
+            });
+
+            updateDashboard();
+        }
+
+        function updateDashboard() {
+            updateKPIs();
+            renderCharts();
+            renderTable();
+            renderMap();
+        }
+
+        function updateKPIs() {
+            const totalKC = filteredData.length;
+            const avgSkor = filteredData.reduce((a, b) => a + b['Total Score'], 0) / totalKC;
+            const avgNPS = filteredData.reduce((a, b) => a + b.NPS, 0) / totalKC;
+            const totalCrit = filteredData.reduce((a, b) => a + b['Jumlah Temuan Critical'], 0);
+
+            $('#statTotalKC').text(totalKC);
+            $('#statSkorNasional').text(avgSkor.toFixed(2));
+            $('#statNPS').text(avgNPS.toFixed(1));
+            $('#statCritical').text(totalCrit);
+        }
+
+        function renderCharts() {
+            if (mainChart) mainChart.destroy();
+            if (predikatChart) predikatChart.destroy();
+            if (regionalChart) regionalChart.destroy();
+            if (pulauChart) pulauChart.destroy();
+
+            const avgSatpam = filteredData.reduce((a,b) => a + b['Nilai Satpam'], 0) / filteredData.length;
+            const avgInfo = filteredData.reduce((a,b) => a + b['Nilai Pelayanan Informasi'], 0) / filteredData.length;
+            const avgAduan = filteredData.reduce((a,b) => a + b['Nilai Penanganan Pengaduan'], 0) / filteredData.length;
+
+            mainChart = new Chart($('#chartLayanan'), {
+                type: 'bar',
+                data: {
+                    labels: ['Satpam', 'Pelayanan Informasi', 'Penanganan Pengaduan'],
+                    datasets: [
+                        { label: 'Capaian', data: [avgSatpam, avgInfo, avgAduan], backgroundColor: '#0D6EFD' },
+                        { label: 'Target', data: [95, 95, 95], type: 'line', borderColor: 'red', borderDash: [5, 5] }
+                    ]
+                },
+                options: { plugins: { legend: { display: true } } }
+            });
+
+            const predikats = ['Sangat Baik', 'Baik', 'Cukup', 'Kurang'];
+            const predData = predikats.map(p => filteredData.filter(x => x.Predikat === p).length);
+
+            predikatChart = new Chart($('#chartPredikat'), {
+                type: 'doughnut',
+                data: {
+                    labels: predikats,
+                    datasets: [{ data: predData, backgroundColor: ['#198754', '#0D6EFD', '#ffc107', '#dc3545'] }]
+                }
+            });
+
+            // Analisis Regional Bar
+            const regLabels = [...new Set(filteredData.map(x => x.Regional))].sort();
+            const regValues = regLabels.map(r => {
+                const group = filteredData.filter(x => x.Regional === r);
+                return group.reduce((a,b) => a + b['Total Score'], 0) / group.length;
+            });
+
+            regionalChart = new Chart($('#chartRegional'), {
+                type: 'bar',
+                data: {
+                    labels: regLabels,
+                    datasets: [{ label: 'Skor Rata-rata', data: regValues, backgroundColor: '#0dcaf0' }]
+                },
+                options: { indexAxis: 'y' }
+            });
+
+            // Analisis Pulau Radar
+            const pulLabels = ['Jawa', 'Sumatera', 'Kalimantan', 'Sulawesi', 'Bali Nusra', 'Maluku Papua'];
+            const pulValues = pulLabels.map(p => {
+                const group = filteredData.filter(x => x.Pulau === p);
+                return group.length ? (group.reduce((a,b) => a + b['Total Score'], 0) / group.length) : 0;
+            });
+
+            pulauChart = new Chart($('#chartPulau'), {
+                type: 'radar',
+                data: {
+                    labels: pulLabels,
+                    datasets: [{ label: 'Performa Wilayah', data: pulValues, fill: true, backgroundColor: 'rgba(13, 110, 253, 0.2)', borderColor: '#0D6EFD' }]
+                }
+            });
+        }
+
+        function renderTable() {
+            const table = $('#tableKC').DataTable();
+            table.clear();
+
+            filteredData.sort((a,b) => b['Total Score'] - a['Total Score']).forEach((kc, i) => {
+                table.row.add([
+                    i + 1,
+                    kc.KC,
+                    kc.Regional,
+                    kc['Total Score'].toFixed(2),
+                    `<span class="badge ${kc.Predikat === 'Sangat Baik' ? 'bg-success' : 'bg-primary'}">${kc.Predikat}</span>`,
+                    kc['Jumlah Temuan Mayor'],
+                    kc['Jumlah Temuan Critical']
+                ]);
+            });
+            table.draw();
+        }
+
+        function renderMap() {
+            // Inisialisasi Peta Leaflet Sederhana
+            if (window.mapObj) window.mapObj.remove();
+            window.mapObj = L.map('indonesia-map').setView([-2.5489, 118.0149], 5);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.mapObj);
+            
+            // Tambahkan marker cluster atau heatmap sederhana di sini sesuai kebutuhan
+        }
+
+        function showDetailKC(kcName) {
+            if(!kcName) return;
+            const kc = rawData.find(x => x.KC === kcName);
+            $('#kc-detail-content').removeClass('d-none');
+            $('#detSkor').text(kc['Total Score']);
+            $('#detPredikat').text(kc.Predikat).attr('class', `badge ${kc['Total Score'] >= 90 ? 'bg-success' : 'bg-primary'}`);
+            $('#detRegional').text(kc.Regional);
+            $('#detProv').text(kc.Provinsi);
+            $('#detShopper').text(kc['Nama Shopper']);
+            $('#detKomentar').text(`"${kc.Komentar}"`);
+
+            if(radarKCChart) radarKCChart.destroy();
+            radarKCChart = new Chart($('#chartRadarKC'), {
+                type: 'radar',
+                data: {
+                    labels: ['Satpam', 'Informasi', 'Pengaduan'],
+                    datasets: [{ data: [kc['Nilai Satpam'], kc['Nilai Pelayanan Informasi'], kc['Nilai Penanganan Pengaduan']], backgroundColor: 'rgba(25, 135, 84, 0.2)', borderColor: '#198754' }]
+                }
+            });
+        }
+
+        $('#darkToggle').click(function() {
+            $('body').toggleClass('bg-dark text-white');
+            $('.card').toggleClass('bg-secondary border-light');
+        });
+    </script>
+
+</body>
+</html>
